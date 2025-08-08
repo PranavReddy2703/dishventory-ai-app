@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "homepage": "https://PranavReddy2703.github.io/dishventory-ai-app",
+  "homepage": "https://PranavReddy2703.github.io/dishventory-ai-app/",
   "scripts": {
     "predeploy": "npm run build",
     "deploy": "gh-pages -d build",
