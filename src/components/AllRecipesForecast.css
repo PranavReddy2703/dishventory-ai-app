@@ -1,0 +1,87 @@
+/* src/components/AllRecipesForecast.css */
+.forecast-section {
+    padding: 1.5rem;
+    background-color: #f9fafb;
+    border-radius: 0.75rem;
+    margin-top: 1rem;
+}
+
+.section-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    color: #1f2937;
+}
+
+.search-bar {
+    margin-bottom: 1rem;
+}
+
+.search-input {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    font-size: 1rem;
+}
+
+.loading-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+}
+
+.spinner {
+    animation: spin 1s linear infinite;
+    border: 2px solid #4f46e5;
+    border-top: 2px solid transparent;
+    border-radius: 50%;
+    width: 1.25rem;
+    height: 1.25rem;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.table-container {
+    overflow-x: auto;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.data-table thead {
+    background-color: #e5e7eb;
+}
+
+.data-table th,
+.data-table td {
+    padding: 0.75rem 1.5rem;
+    text-align: left;
+    font-size: 0.875rem;
+    border-bottom: 1px solid #d1d5db;
+}
+
+.data-table th {
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #4b5563;
+}
+
+.data-table td {
+    color: #374151;
+}
+
+.data-table tbody tr:hover {
+    background-color: #f3f4f6;
+}
+
+.text-right {
+    text-align: right;
+}
