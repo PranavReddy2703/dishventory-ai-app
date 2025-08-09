@@ -3,7 +3,7 @@ import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import './TotalIngredientsSummary.css';
 
-const TotalIngredientsSummary = ({ recipes, ingredients, loading, setError, getIngredientName, API_BASE_URL }) => {
+const TotalIngredientsSummary = ({ ingredients, loading, setError, API_BASE_URL }) => {
   const [totalIngredients, setTotalIngredients] = useState(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [salesChoice, setSalesChoice] = useState('avg'); // 'lowest', 'avg', 'highest'
@@ -12,52 +12,36 @@ const TotalIngredientsSummary = ({ recipes, ingredients, loading, setError, getI
     setSummaryLoading(true);
     setError(null);
     try {
-      const allForecasts = await Promise.all(
-        recipes.map(async (recipe) => {
-          const response = await fetch(`${API_BASE_URL}/forecast?recipeId=${recipe.id}`);
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || `Failed to get forecast for ${recipe.name}`);
-          }
-          return response.json();
-        })
-      );
+      const response = await fetch(`${API_BASE_URL}/ingredients/summary`);
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || "Failed to get ingredients summary");
+      }
+      const summaryData = await response.json();
 
       const combinedIngredients = {};
-      allForecasts.forEach(forecast => {
-        let salesToUse = 0;
-        if (salesChoice === 'lowest') {
-          salesToUse = forecast.lowest_sales;
-        } else if (salesChoice === 'highest') {
-          salesToUse = forecast.highest_sales;
-        } else {
-          salesToUse = forecast.avg_sales;
-        }
+      summaryData.forEach(item => {
+        let quantity = 0;
+        if (salesChoice === 'lowest') quantity = item.total_lower;
+        else if (salesChoice === 'highest') quantity = item.total_upper;
+        else quantity = item.total;
 
-        for (const [name, details] of Object.entries(forecast.ingredients_needed)) {
-          if (!combinedIngredients[name]) {
-            combinedIngredients[name] = { quantity: 0, unit: details.unit, available: 0, toBuy: 0 };
-          }
-          combinedIngredients[name].quantity += details.quantity;
-        }
+        combinedIngredients[item.ingredient] = {
+          name: item.ingredient,
+          quantity,
+          unit: "g", // default unit
+          available: 0
+        };
       });
 
-      // Fetch the current stock for each ingredient
-      const ingredientsData = await fetch(`${API_BASE_URL}/ingredients`);
-      const currentStock = await ingredientsData.json();
-
-      Object.keys(combinedIngredients).forEach(ingredientName => {
-        const stockItem = currentStock.find(item => item.name === ingredientName);
+      // match stock from props
+      Object.keys(combinedIngredients).forEach(name => {
+        const stockItem = ingredients.find(i => i.name === name);
         if (stockItem) {
-          combinedIngredients[ingredientName].available = stockItem.quantity;
-          const toBuy = combinedIngredients[ingredientName].quantity - stockItem.quantity;
-          combinedIngredients[ingredientName].toBuy = toBuy > 0 ? toBuy : 0;
-        } else {
-          // If the ingredient is not in stock, the entire needed quantity needs to be bought
-          combinedIngredients[ingredientName].toBuy = combinedIngredients[ingredientName].quantity;
+          combinedIngredients[name].available = stockItem.quantity;
         }
       });
-      
+
       setTotalIngredients(combinedIngredients);
     } catch (err) {
       setError(err.message);
@@ -67,10 +51,10 @@ const TotalIngredientsSummary = ({ recipes, ingredients, loading, setError, getI
   };
 
   useEffect(() => {
-    if (recipes.length > 0) {
+    if (ingredients.length > 0) {
       fetchTotalIngredients();
     }
-  }, [recipes, salesChoice]);
+  }, [ingredients, salesChoice]);
 
   const formatQuantity = (quantity, unit) => {
     if (unit === 'g' && quantity >= 1000) {
@@ -79,16 +63,22 @@ const TotalIngredientsSummary = ({ recipes, ingredients, loading, setError, getI
     if (unit === 'ml' && quantity >= 1000) {
       return `${(quantity / 1000).toFixed(2)} L`;
     }
-    return `${quantity} ${unit}`;
+    return `${quantity.toFixed(2)} ${unit}`;
   };
 
   const handleDownload = () => {
-    const data = Object.entries(totalIngredients || {}).map(([name, details]) => ({
-      'Ingredient Name': name,
-      'Needed': `${details.quantity} ${details.unit}`,
-      'In Stock': `${details.available} ${details.unit}`,
-      'To Buy': `${details.toBuy} ${details.unit}`,
-    }));
+    const data = Object.values(totalIngredients || {}).map(details => {
+      const diff = details.available - details.quantity;
+      const status = diff >= 0
+        ? `Surplus ${formatQuantity(diff, details.unit)}`
+        : `Shortfall ${formatQuantity(Math.abs(diff), details.unit)}`;
+      return {
+        'Ingredient Name': details.name,
+        'Needed': formatQuantity(details.quantity, details.unit),
+        'In Stock': formatQuantity(details.available, details.unit),
+        'Inventory Status': status
+      };
+    });
 
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
@@ -102,7 +92,7 @@ const TotalIngredientsSummary = ({ recipes, ingredients, loading, setError, getI
     <div className="forecast-section">
       <h3 className="section-title">Total Ingredients Needed for Next Week</h3>
       <div className="sales-choice">
-        <span>Forecast based on:</span>
+        <span>Quantity Needed:</span>
         <label>
           <input
             type="radio"
@@ -111,7 +101,7 @@ const TotalIngredientsSummary = ({ recipes, ingredients, loading, setError, getI
             checked={salesChoice === 'lowest'}
             onChange={(e) => setSalesChoice(e.target.value)}
           />{' '}
-          Lowest Sales
+          Min. Qty.
         </label>
         <label>
           <input
@@ -121,7 +111,7 @@ const TotalIngredientsSummary = ({ recipes, ingredients, loading, setError, getI
             checked={salesChoice === 'avg'}
             onChange={(e) => setSalesChoice(e.target.value)}
           />{' '}
-          Average Sales
+          Average Qty.
         </label>
         <label>
           <input
@@ -131,12 +121,17 @@ const TotalIngredientsSummary = ({ recipes, ingredients, loading, setError, getI
             checked={salesChoice === 'highest'}
             onChange={(e) => setSalesChoice(e.target.value)}
           />{' '}
-          Highest Sales
+          Max. Qty.
         </label>
+        <button
+          onClick={handleDownload}
+          className="download-button"
+          disabled={summaryLoading || !totalIngredients}
+        >
+          Download as Excel
+        </button>
       </div>
-      <button onClick={handleDownload} className="download-button" disabled={summaryLoading || !totalIngredients}>
-        Download as Excel
-      </button>
+
       {summaryLoading ? (
         <div className="loading-container">
           <div className="spinner"></div>
@@ -150,22 +145,32 @@ const TotalIngredientsSummary = ({ recipes, ingredients, loading, setError, getI
                 <th>Ingredient Name</th>
                 <th className="text-right">Needed</th>
                 <th className="text-right">In Stock</th>
-                <th className="text-right">To Buy</th>
+                <th className="text-right">Inventory Status</th>
               </tr>
             </thead>
             <tbody>
-              {Object.entries(totalIngredients || {}).map(([name, details]) => (
-                <tr key={name}>
-                  <td>{name}</td>
-                  <td className="text-right">{formatQuantity(details.quantity, details.unit)}</td>
-                  <td className="text-right">{formatQuantity(details.available, details.unit)}</td>
-                  <td className="text-right">
-                    <span className={details.toBuy > 0 ? 'text-red' : 'text-green'}>
-                      {formatQuantity(details.toBuy, details.unit)}
-                    </span>
-                  </td>
-                </tr>
-              ))}
+              {Object.values(totalIngredients || {}).map(details => {
+                const diff = details.available - details.quantity;
+                const isSurplus = diff >= 0;
+                return (
+                  <tr key={details.name}>
+                    <td>{details.name}</td>
+                    <td className="text-right">{formatQuantity(details.quantity, details.unit)}</td>
+                    <td className="text-right">{formatQuantity(details.available, details.unit)}</td>
+                    <td className="text-right">
+                      {isSurplus ? (
+                        <span className="text-green">
+                          {formatQuantity(diff, details.unit)}
+                        </span>
+                      ) : (
+                        <span className="text-red">
+                          {formatQuantity(Math.abs(diff), details.unit)}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

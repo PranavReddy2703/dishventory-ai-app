@@ -10,7 +10,7 @@ import './App.css';
 const API_BASE_URL = "http://127.0.0.1:5000/api";
 
 const App = () => {
-  const [activePage, setActivePage] = useState('inventory');
+  const [activePage, setActivePage] = useState('billing');
   const [ingredients, setIngredients] = useState([]);
   const [ingredientForm, setIngredientForm] = useState({ name: '', quantity: '', unit: 'g' });
   const [editingIngredientId, setEditingIngredientId] = useState(null);
@@ -179,9 +179,9 @@ const App = () => {
       const method = editingRecipeId ? 'PUT' : 'POST';
       const payload = {
         name: recipeForm.name,
-        pizza_id: recipeForm.pizza_id,
-        pizza_size: recipeForm.pizza_size,
-        pizza_category: recipeForm.pizza_category,
+        pizza_id: form.pizza_id,
+        pizza_size: form.pizza_size,
+        pizza_category: form.pizza_category,
         ingredients: recipeForm.ingredients.map(ing => ({
           ...ing,
           quantity: Number(ing.quantity),
@@ -202,7 +202,7 @@ const App = () => {
       setLoading(false);
     }
   };
-  
+
   const handleDeleteRecipe = async (id) => {
     if (!window.confirm("Are you sure you want to delete this recipe?")) return;
     setLoading(true);
